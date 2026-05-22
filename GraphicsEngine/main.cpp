@@ -23,6 +23,13 @@ const char* fragmentShaderSource = "#version 330 core\n"
 "	FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);"
 "}\0";
 
+const char* fragmentShaderSourceYellow = "#version 330 core\n"
+"out vec4 FragColor;\n"
+"void main()\n"
+"{\n"
+"	FragColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);"
+"}\0";
+
 int main() {
 	//Init & Configure GLFW (OpenGL version 3.3, core profile)
 	glfwInit();
@@ -46,7 +53,7 @@ int main() {
 	//Initialize GLAD (loads all OpenGL function pointers)
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
 		std::cout << "Failed to initialize GLAD" << std::endl;
-		//TODO: Should glfwTerminate be called here?
+		glfwTerminate();
 		return -1;
 	}
 
@@ -60,7 +67,7 @@ int main() {
 	char infoLog[512];
 	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
 	if (!success) {
-		glad_glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
+		glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
 		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
 	}
 
@@ -72,7 +79,17 @@ int main() {
 	//Check if shader compilation successful
 	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
 	if (!success) {
-		glad_glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
+		glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
+		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+
+	unsigned int fragmentShaderYellow = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragmentShaderYellow, 1, &fragmentShaderSourceYellow, nullptr);
+	glCompileShader(fragmentShaderYellow);
+
+	glGetShaderiv(fragmentShaderYellow, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(fragmentShaderYellow, 512, nullptr, infoLog);
 		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
 	}
 
@@ -89,16 +106,36 @@ int main() {
 		std::cout << "ERROR::SHADER::PROGRAM::COMPILATION_FAILED\n" << infoLog << std::endl;
 	}
 	//After shader objects have been linked, they can be safely deleted
-	glDeleteShader(vertexShader);
+	//glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
+
+	unsigned int shaderProgram2 = glCreateProgram();
+	glAttachShader(shaderProgram2, vertexShader);
+	glAttachShader(shaderProgram2, fragmentShaderYellow);
+	glLinkProgram(shaderProgram2);
+
+	glGetProgramiv(shaderProgram2, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(shaderProgram2, 512, nullptr, infoLog);
+		std::cout << "ERROR::SHADER::PROGRAM::COMPILATION_FAILED\n" << infoLog << std::endl;
+	}
+	glDeleteShader(vertexShader);
+	glDeleteShader(fragmentShaderYellow);
 
 	//Setup vertex data
 	//x, y, z
 	float vertices[] = {
-		0.5f, 0.5f, 0.0f, // Top right
-		0.5f, -0.5f, 0.0f, //Bottom right
-		-0.5f, -0.5f, 0.0f, //Bottom left
-		-0.5f, 0.5f, 0.0f //Top left
+		//First triangle
+		0.45f, 0.5f, 0.0f, // Top
+		0.9f, -0.5f, 0.0f, //Bottom right
+		0.0f, -0.5f, 0.0f, //Bottom left
+	};
+
+	float verticesYellow[] = {
+		//Second triangle
+		-0.45f, 0.5f, 0.0f, // Top
+		0.0f, -0.5f, 0.0f, //Bottom right
+		-0.9f, -0.5f, 0.0f, //Bottom left
 	};
 
 	unsigned int indices[] = {
@@ -107,29 +144,43 @@ int main() {
 	};
 
 	//vertex buffer object (VBO)
-	unsigned int VBO, VAO, EBO;
-	glGenVertexArrays(1, &VAO);
+	unsigned int VBOs[2], VAOs[2];// , EBO;
+	glGenVertexArrays(2, VAOs); //Generate a VAO and give ID
 	//generate buffer ID
-	glGenBuffers(1, &VBO);
-	glGenBuffers(1, &EBO);
+	glGenBuffers(2, VBOs);
+	//glGenBuffers(1, &EBO);
 
 	//Bind Vertex Array Object (VAO)
-	glBindVertexArray(VAO);
-	
+	glBindVertexArray(VAOs[0]);
+
 	//bind the buffer (ARRAY_BUFFER for VBOs)
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOs[0]);
 	//copy vertex data into memory (copies user defined data into currently bound buffer)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW); //Since the position of the triangle isn't going to move, and is used alot, thus is static_draw.
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	//Link vertex attributes
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0); //Tells VAO how to interpret raw vertex data
+	glEnableVertexAttribArray(0); //Enable vertex attribute so it gets used in rendering
+
+	//unbind stuff
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+
+	glBindVertexArray(VAOs[1]);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOs[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesYellow), verticesYellow, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
+	//unbind stuff
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
+
+	//Wireframe mode
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	//Render loop (iterations = frames)
 	while (!glfwWindowShouldClose(window)) {
@@ -137,24 +188,33 @@ int main() {
 		processInput(window);
 
 		//render
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+		glClearColor(0.2f, 0.3f, 0.3f, 1.0f); //Sets color used when clearing the screen
+		glClear(GL_COLOR_BUFFER_BIT); //Clears screen with the set clear color
 
-		//draw triangle
+		//draw first triangle
 		glUseProgram(shaderProgram);
-		glBindVertexArray(VAO);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+		glBindVertexArray(VAOs[0]);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		//draw second triangle
+		glUseProgram(shaderProgram2);
+		glBindVertexArray(VAOs[1]);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
 
 		//check & call events & swap buffers
-		glfwSwapBuffers(window); //TODO: Read up more on this
+		glfwSwapBuffers(window); //Swaps front and back buffers to display the rendered frame
 		glfwPollEvents();//Checks for any events (IO, etc)
 	}
 
 	//Deallocate resources
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
-	glDeleteProgram(shaderProgram);
+	glDeleteVertexArrays(2, VAOs); //frees VAO memory
+	glDeleteBuffers(2, VBOs); //frees VBO memory
+	//glDeleteBuffers(1, &EBO); //frees EBO memory
+	glDeleteProgram(shaderProgram); //frees shader program memory
+	glDeleteProgram(shaderProgram2);
 
 	glfwTerminate();
 	return 0;
