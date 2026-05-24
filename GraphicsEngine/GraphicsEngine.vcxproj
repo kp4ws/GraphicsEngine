@@ -21,6 +21,15 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\external\src\glad.c" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="main_old.cpp" />
+    <ClCompile Include="Shader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Shader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shader.frag" />
+    <None Include="shader.vs" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
