@@ -11,23 +11,27 @@ const unsigned int SCREEN_HEIGHT = 600;
 
 const char* vertexShaderSource = "#version 330 core\n"
 "layout (location = 0) in vec3 aPos;\n"
+"out vec4 vertexColor;\n" //specify a color output to the fragment shader
 "void main()\n"
 "{\n"
 "	gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+"	vertexColor = vec4(0.5, 0.0, 0.0, 1.0);\n"
 "}\0";
 
 const char* fragmentShaderSource = "#version 330 core\n"
 "out vec4 FragColor;\n"
+"in vec4 vertexColor;\n" //input variable from vertexShader (gets connected in programShader linking)
 "void main()\n"
 "{\n"
-"	FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);"
+"	FragColor = vertexColor;\n"
 "}\0";
 
 const char* fragmentShaderSourceYellow = "#version 330 core\n"
 "out vec4 FragColor;\n"
+"uniform vec4 ourColor;\n"
 "void main()\n"
 "{\n"
-"	FragColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);"
+"	FragColor = ourColor;\n"
 "}\0";
 
 int main() {
@@ -180,7 +184,7 @@ int main() {
 	glBindVertexArray(0);
 
 	//Wireframe mode
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	//Render loop (iterations = frames)
 	while (!glfwWindowShouldClose(window)) {
@@ -191,13 +195,20 @@ int main() {
 		glClearColor(0.2f, 0.3f, 0.3f, 1.0f); //Sets color used when clearing the screen
 		glClear(GL_COLOR_BUFFER_BIT); //Clears screen with the set clear color
 
+		float timeValue = glfwGetTime();
+		float greenValue = static_cast<float>(sin(timeValue) / 2.0f + 0.5f);
+		int vertexColorLocation = glGetUniformLocation(shaderProgram2, "ourColor");
+		glUniform4f(vertexColorLocation, 0.0f, greenValue, 0.0f, 1.0f);
+
+		glUseProgram(shaderProgram2);
+
 		//draw first triangle
-		glUseProgram(shaderProgram);
-		glBindVertexArray(VAOs[0]);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		//glUseProgram(shaderProgram);
+		//glBindVertexArray(VAOs[0]);
+		//glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		//draw second triangle
-		glUseProgram(shaderProgram2);
+		//glUseProgram(shaderProgram2);
 		glBindVertexArray(VAOs[1]);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
