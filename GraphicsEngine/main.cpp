@@ -44,9 +44,9 @@ int main() {
 	float vertices[] = {
 		//First Triangle
 		//Positions(x,y,z) //Colors
-		0.45f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f,// Top
-		0.9f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,//Bottom right
-		0.0f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f,//Bottom left
+		0.0f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f,// Top
+		0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,//Bottom right
+		-0.5f, -0.5f, 0.0f, 0.0f, 0.0f, 1.0f,//Bottom left
 	};
 
 	//vertex buffer object (VBO)
@@ -104,6 +104,10 @@ int main() {
 		ourShader.use();
 		glBindVertexArray(VAOs[0]);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		float timeValue = glfwGetTime();
+		float xOffset = static_cast<float>(sin(timeValue) / 2.0f);
+		ourShader.setFloat("xOffset", xOffset);
 
 		//check & call events & swap buffers
 		glfwSwapBuffers(window); //Swaps front and back buffers to display the rendered frame
