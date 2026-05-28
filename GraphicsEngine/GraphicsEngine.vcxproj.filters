@@ -40,7 +40,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shader.vs">
+    <None Include="shader.vert">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="shader.frag">
