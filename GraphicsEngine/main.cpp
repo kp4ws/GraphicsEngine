@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "Camera.h"
 #include "Shader.h"
 #include "stb_image.h"
 
@@ -11,11 +12,24 @@
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow* window);
+void mouseCallback(GLFWwindow* window, double xPosIn, double yPosIn);
+void scrollCallback(GLFWwindow* window, double xOffset, double yOffset);
 
+//settings
 const unsigned int SCREEN_WIDTH = 800;
 const unsigned int SCREEN_HEIGHT = 600;
 
 float mixValue = 0.2f;
+
+//camera
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = (float)SCREEN_WIDTH / 2.0f;
+float lastY = (float)SCREEN_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+//timing
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
 int main() {
 	//Init & Configure GLFW (OpenGL version 3.3, core profile)
@@ -33,9 +47,12 @@ int main() {
 	}
 
 	glfwMakeContextCurrent(window);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	//Register resize callback function
 	//**Callback functions should be registered after window is created and before render loop is initialized**
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	glfwSetCursorPosCallback(window, mouseCallback);
+	glfwSetScrollCallback(window, scrollCallback);
 
 	//Initialize GLAD (loads all OpenGL function pointers)
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -204,14 +221,36 @@ int main() {
 	stbi_image_free(data);
 
 	ourShader.use();
-	glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0);
+	ourShader.setInt("texture1", 0);
 	ourShader.setInt("texture2", 1);
+
+	//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+	//glm::vec3 cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f); //Actually is pointing in reverse direction
+	//glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraTarget);
+
+	////Gram-Schmidt process (finding a set of two or more vectors that are perpendicular to each other)
+	//glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f); //Up vector in world space
+	//glm::vec3 cameraRight = glm::normalize(glm::cross(up, cameraDirection)); //Cross product of up and direction give us perpendicular right vector for camera
+	//glm::vec3 cameraUp = glm::cross(cameraDirection, cameraRight);
+
+	//glm::mat4 view;
+	//view = glm::lookAt(
+	//	glm::vec3(0.0f, 0.0f, 3.0f), //Camera position
+	//	glm::vec3(0.0f, 0.0f, 0.0f), //Target position
+	//	glm::vec3(0.0f, 1.0f, 0.0f) //Up vector in world space
+	//);
+
 
 	//Wireframe mode
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	//Render loop (iterations = frames)
 	while (!glfwWindowShouldClose(window)) {
+		//per frame timing logic
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
+
 		//input
 		processInput(window);
 
@@ -235,16 +274,16 @@ int main() {
 
 		ourShader.use();
 
-		glm::mat4 view = glm::mat4(1.0f);
-		glm::mat4 projection = glm::mat4(1.0f);
+		//view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+		/*
+		const float radius = 10.0f;
+		float camX = sin(glfwGetTime()) * radius;
+		float camZ = cos(glfwGetTime()) * radius;*/
 
-		view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-		projection = glm::perspective(glm::radians(45.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
-
-		unsigned int modelLoc = glGetUniformLocation(ourShader.ID, "model");
-		unsigned int viewLoc = glGetUniformLocation(ourShader.ID, "view");
-
+		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 100.0f);
 		ourShader.setMat4("projection", projection);
+
+		glm::mat4 view = camera.GetViewMatrix();
 		ourShader.setMat4("view", view);
 
 		/*unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "t/*ransform");
@@ -312,8 +351,10 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
 }
 
 void processInput(GLFWwindow* window) {
+	//TODO in mousecallback need to register event for recapturing the mouse
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-		glfwSetWindowShouldClose(window, true);
+		//glfwSetWindowShouldClose(window, true);
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
@@ -325,4 +366,54 @@ void processInput(GLFWwindow* window) {
 		if (mixValue <= 0.0f) return;
 		mixValue -= 0.001f;
 	}
+
+	//To move forward/backward, we add/subtract direction vector by position vector scaled by some speed value
+	//To move sideways, we do cross product to form right vector and move along it accordingly
+	//->We normalize right vector because it may return differently sized vectors based on cameraFront (which would cause us not to move at a constant speed)
+
+	float cameraSpeed;
+	const float fastSpeed = 5.0f;
+	const float normalSpeed = 2.5f;
+	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+		cameraSpeed = fastSpeed * deltaTime;
+	}
+	else {
+		cameraSpeed = normalSpeed * deltaTime;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+		camera.ProcessKeyboard(FORWARD, deltaTime);
+	}
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+		camera.ProcessKeyboard(LEFT, deltaTime);
+	}
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+		camera.ProcessKeyboard(BACKWARD, deltaTime);
+	}
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+		camera.ProcessKeyboard(RIGHT, deltaTime);
+	}
+}
+
+void mouseCallback(GLFWwindow* window, double xPosIn, double yPosIn) {
+	float xPos = static_cast<float>(xPosIn);
+	float yPos = static_cast<float>(yPosIn);
+
+	//Prevents initial jump when mouse is focused in window
+	if (firstMouse) {
+		lastX = xPos;
+		lastY = yPos;
+		firstMouse = false;
+	}
+
+	float xOffset = xPos - lastX;
+	float yOffset = lastY - yPos; //Reversed because y-coordinate range from bottom to top
+	lastX = xPos;
+	lastY = yPos;
+
+	camera.ProcessMouseMovement(xOffset, yOffset);
+}
+
+void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
+	camera.ProcessMouseScroll(static_cast<float>(yOffset));
 }
